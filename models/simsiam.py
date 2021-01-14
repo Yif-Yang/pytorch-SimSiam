@@ -3,7 +3,15 @@ import torch.nn as nn
 import math
 # from models.resnet import resnet50
 from torchvision.models import resnet50
+import torch.nn.functional as F
 
+
+def negcos(p, z):
+    # z = z.detach()
+    p = F.normalize(p, dim=1)
+    z = F.normalize(z, dim=1)
+    return -(p*z.detach()).sum(dim=1).mean()
+    # return - nn.functional.cosine_similarity(p, z.detach(), dim=-1).mean()
 
 class ProjectionMLP(nn.Module):
     def __init__(self, in_dim, mid_dim, out_dim):
@@ -22,10 +30,16 @@ class ProjectionMLP(nn.Module):
             nn.Linear(mid_dim, out_dim),
             nn.BatchNorm1d(out_dim)
         )
+        self.is_cifar_flag = False
+
+    def is_cifar(self, is_cifar=True):
+        self.is_cifar_flag = is_cifar
+        print('cifar settings')
 
     def forward(self, x):
         x = self.l1(x)
-        x = self.l2(x)
+        if not self.is_cifar_flag:
+            x = self.l2(x)
         x = self.l3(x)
 
         return x
@@ -53,12 +67,13 @@ class SimSiam(nn.Module):
     def __init__(self, backbone='resnet50', d=2048):
         super(SimSiam, self).__init__()
 
-        if backbone == 'resnet50':
-            net = resnet50()
-        else:
-            raise NotImplementedError('Backbone model not implemented.')
+        # if backbone == 'resnet50':
+        #     net = resnet50()
+        # else:
+        #     raise NotImplementedError('Backbone model not implemented.')
 
-        num_ftrs = net.fc.in_features
+        net = backbone
+        num_ftrs = net.output_dim
         self.features = nn.Sequential(*list(net.children())[:-1])
         # num_ftrs = net.fc.out_features
         # self.features = net
