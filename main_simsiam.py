@@ -341,7 +341,8 @@ def main_worker(gpu, ngpus_per_node, args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        adjust_learning_rate(optimizer, epoch, args)#TODO(yifan):maybe switch to warmup
+        if args.warmup_epochs == 0:
+            adjust_learning_rate(optimizer, epoch, args)#TODO(yifan):maybe switch to warmup
         logger.info('Lr:{}{}'.format(optimizer.param_groups[0]['lr'], args.epochs))
 
         # train for one epoch
