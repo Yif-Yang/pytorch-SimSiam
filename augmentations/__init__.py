@@ -5,12 +5,11 @@ from .simclr_aug import SimCLRTransform
 def get_aug(name, image_size, train, train_classifier=True, aug_type=None):
 
     if train==True:
-        if name == 'simsiam':
+        if 'simsiam' in name:
 
             if aug_type is None:
                 augmentation = SimSiamTransform(image_size)
-            elif aug_type == 'add_2_hard':
-                augmentation = SimSiamTransform(image_size)
+
         elif name == 'byol':
             augmentation = BYOL_transform(image_size)
         elif name == 'simclr':

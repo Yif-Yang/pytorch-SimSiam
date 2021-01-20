@@ -11,7 +11,8 @@ def knn_monitor(net, memory_data_loader, test_data_loader, k=200, t=0.1, hide_pr
         # generate feature bank
         for data, target in tqdm(memory_data_loader, desc='Feature extracting', leave=False, disable=hide_progress):
             feature = net(data.cuda(non_blocking=True))
-            feature = feature.view(feature.size(0), -1)#TODO(Yifan):dirty
+            if len(feature.shape) > 2:
+                feature = feature.view(feature.size(0), -1)#TODO(Yifan):dirty
 
             feature = F.normalize(feature, dim=1)
             feature_bank.append(feature)
@@ -24,7 +25,8 @@ def knn_monitor(net, memory_data_loader, test_data_loader, k=200, t=0.1, hide_pr
         for data, target in test_bar:
             data, target = data.cuda(non_blocking=True), target.cuda(non_blocking=True)
             feature = net(data)
-            feature = feature.view(feature.size(0), -1)#TODO(Yifan):dirty
+            if len(feature.shape) > 2:
+                feature = feature.view(feature.size(0), -1)#TODO(Yifan):dirty
             feature = F.normalize(feature, dim=1)
             
             pred_labels = knn_predict(feature, feature_bank, feature_labels, classes, k, t)

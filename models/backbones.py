@@ -10,11 +10,11 @@ def resnet18_cifar_new(**kwargs):
     from .resnet_cifar_new import resnet18 as resnet18_new
     return resnet18_new()
 
-def resnet_cifar_new_no_maxpool(**kwargs):
+def resnet18_cifar_new_no_maxpool(**kwargs):
     from .resnet_cifar_new_no_maxpool import resnet18 as resnet18_new_no_maxpool
     return resnet18_new_no_maxpool()
 
-def resnet_cifar_from_taoyang(**kwargs):
+def resnet18_cifar_from_taoyang(**kwargs):
     from .resnet_from_taoyang1122 import ResNet as resnet_cifar_from_taoyang
     return resnet_cifar_from_taoyang('cifar10', depth=18, num_classes=1000, bottleneck=False)
 
