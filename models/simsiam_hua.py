@@ -1,21 +1,21 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F 
+import torch.nn.functional as F
 from torchvision.models import resnet50
+import math
 
 
-def D(p, z, version='simplified'): # negative cosine similarity
+def D(p, z, version='original'):  # negative cosine similarity
     if version == 'original':
-        z = z.detach() # stop gradient
-        p = F.normalize(p, dim=1) # l2-normalize 
-        z = F.normalize(z, dim=1) # l2-normalize 
-        return -(p*z).sum(dim=1).mean()
+        z = z.detach()  # stop gradient
+        p = F.normalize(p, dim=1)  # l2-normalize
+        z = F.normalize(z, dim=1)  # l2-normalize
+        return -(p * z).sum(dim=1).mean()
 
-    elif version == 'simplified':# same thing, much faster. Scroll down, speed test in __main__
+    elif version == 'simplified':  # same thing, much faster. Scroll down, speed test in __main__
         return - F.cosine_similarity(p, z.detach(), dim=-1).mean()
     else:
         raise Exception
-
 
 
 class projection_MLP(nn.Module):
@@ -42,6 +42,7 @@ class projection_MLP(nn.Module):
             nn.BatchNorm1d(hidden_dim)
         )
         self.num_layers = 3
+
     def set_layers(self, num_layers):
         self.num_layers = num_layers
 
@@ -55,11 +56,11 @@ class projection_MLP(nn.Module):
             x = self.layer3(x)
         else:
             raise Exception
-        return x 
+        return x
 
 
 class prediction_MLP(nn.Module):
-    def __init__(self, in_dim=2048, hidden_dim=512, out_dim=2048): # bottleneck structure
+    def __init__(self, in_dim=2048, hidden_dim=512, out_dim=2048):  # bottleneck structure
         super().__init__()
         ''' page 3 baseline setting
         Prediction MLP. The prediction MLP (h) has BN applied 
@@ -84,32 +85,48 @@ class prediction_MLP(nn.Module):
     def forward(self, x):
         x = self.layer1(x)
         x = self.layer2(x)
-        return x 
+        return x
+
 
 class SimSiam(nn.Module):
     def __init__(self, backbone=resnet50()):
         super().__init__()
-        
+
         self.backbone = backbone
         self.projector = projection_MLP(backbone.output_dim)
 
-        self.encoder = nn.Sequential( # f encoder
+        self.encoder = nn.Sequential(  # f encoder
             self.backbone,
             self.projector
         )
         self.predictor = prediction_MLP()
-    
-    def forward(self, x1, x2):
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # reset conv initialization to default uniform initialization
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
+                stdv = 1. / math.sqrt(n)
+                m.weight.data.uniform_(-stdv, stdv)
+                if m.bias is not None:
+                    m.bias.data.uniform_(-stdv, stdv)
+            elif isinstance(m, nn.Linear):
+                stdv = 1. / math.sqrt(m.weight.size(1))
+                m.weight.data.uniform_(-stdv, stdv)
+                if m.bias is not None:
+                    m.bias.data.uniform_(-stdv, stdv)
+
+    def forward(self, x1, x2, one_way=False):
 
         f, h = self.encoder, self.predictor
         z1, z2 = f(x1), f(x2)
         p1, p2 = h(z1), h(z2)
-        L = D(p1, z2) / 2 + D(p2, z1) / 2
+        if one_way:
+            L = D(p1, z2) / 2
+        else:
+            L = D(p1, z2) / 2 + D(p2, z1) / 2
         return L
-
-
-
-
 
 
 if __name__ == "__main__":
@@ -123,6 +140,7 @@ if __name__ == "__main__":
     z1 = torch.randn((200, 2560))
     z2 = torch.randn_like(z1)
     import time
+
     tic = time.time()
     print(D(z1, z2, version='original'))
     toc = time.time()
