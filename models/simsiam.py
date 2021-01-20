@@ -64,7 +64,7 @@ class PredictionMLP(nn.Module):
 
 class SimSiam(nn.Module):
 
-    def __init__(self, backbone='resnet50', d=2048):
+    def __init__(self, backbone='resnet50', d=2048, is_cifar=False):
         super(SimSiam, self).__init__()
 
         # if backbone == 'resnet50':
@@ -82,6 +82,8 @@ class SimSiam(nn.Module):
         self.projection = ProjectionMLP(num_ftrs, 2048, 2048)
         # prediction MLP
         self.prediction = PredictionMLP(2048, 512, 2048)
+        if is_cifar:
+            self.projection.is_cifar()
 
         self.reset_parameters()
 

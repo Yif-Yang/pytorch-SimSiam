@@ -16,9 +16,9 @@ def get_backbone(backbone, castrate=True):
     return backbone
 
 
-def get_model(name, backbone):
+def get_model(name, backbone, is_cifar=False):
     if name == 'simsiam':
-        model = SimSiam(get_backbone(backbone))
+        model = SimSiam(get_backbone(backbone), is_cifar=is_cifar)
     elif name == 'simsiamhua':
         model = Simsiamhua(get_backbone(backbone))
     else:
