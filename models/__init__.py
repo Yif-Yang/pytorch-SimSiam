@@ -21,6 +21,9 @@ def get_model(name, backbone, is_cifar=False):
         model = SimSiam(get_backbone(backbone), is_cifar=is_cifar)
     elif name == 'simsiamhua':
         model = Simsiamhua(get_backbone(backbone))
+        if is_cifar:
+            model.projector.set_layers(2)
+
     else:
         raise NotImplementedError
     return model

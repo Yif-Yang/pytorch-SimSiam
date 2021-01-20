@@ -349,7 +349,7 @@ def main_worker(gpu, ngpus_per_node, args):
         # train for one epoch
         train(train_loader, model, optimizer, epoch, args, lr_scheduler)
 
-        if epoch % args.test_epoch == 0 and not  args.distributed:
+        if epoch % args.test_epoch == 0 and args.rank== 0:
             accuracy = knn_monitor(model.backbone, memory_loader, test_loader,  k=200,
                                    hide_progress=args.hide_progress)
             print('accuracy: ', accuracy)
