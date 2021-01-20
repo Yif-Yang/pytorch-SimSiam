@@ -118,6 +118,7 @@ parser.add_argument('--optimizer', type=str, default='sgd',
 parser.add_argument('--eval_after_train', type=str, default=None)
 parser.add_argument('--test_epoch', type=int, default=10)
 parser.add_argument('--debug', action='store_true')
+parser.add_argument('--is_cifar', action='store_true')
 parser.add_argument('--image_size', type=int, default=224)
 parser.add_argument('--data_dir', type=str, default=os.getenv('DATA'))
 parser.add_argument('--output_dir', type=str, default=os.getenv('OUTPUT'))
@@ -187,7 +188,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     # model = SimSiam(backbone=args.arch)
-    model = get_model(args.model, args.arch)
+    model = get_model(args.model, args.arch, args.is_cifar or 'cifar' in args.dataset)
     if args.distributed:
         model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
     print(model)
