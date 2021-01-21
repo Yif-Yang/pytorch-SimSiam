@@ -166,6 +166,7 @@ def main():
 
 def main_worker(gpu, ngpus_per_node, args):
     args.gpu = gpu
+    print('gpu : ', gpu)
 
     # suppress printing if not master
     if args.multiprocessing_distributed and args.gpu != 0:
@@ -342,8 +343,8 @@ def main_worker(gpu, ngpus_per_node, args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        if args.warmup_epochs == 0:
-            adjust_learning_rate(optimizer, epoch, args)#TODO(yifan):maybe switch to warmup
+        # if args.warmup_epochs == 0:
+        # adjust_learning_rate(optimizer, epoch, args)#TODO(yifan):maybe switch to warmup
         logger.info('Lr:{}{}'.format(optimizer.param_groups[0]['lr'], args.epochs))
 
         # train for one epoch
@@ -389,9 +390,13 @@ def train(train_loader, model, optimizer, epoch, args, lr_scheduler):
         # compute output
         # output, target = model(im_q=images[0], im_k=images[1])
         # loss = criterion(output, target)
-        z1, p1 = model(images[0])
-        z2, p2 = model(images[1])
-        loss = negcos(p1, z2) / 2 + negcos(p2, z1) / 2
+
+        # z1, p1 = model(images[0])
+        # z2, p2 = model(images[1])
+        # loss = negcos(p1, z2) / 2 + negcos(p2, z1) / 2
+
+        loss = model(x1=images[0], x2=images[1])
+
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy
         # measure accuracy and record loss
@@ -449,10 +454,10 @@ def adjust_learning_rate(optimizer, epoch, args):
 
 
 def negcos(p, z):
-    # z = z.detach()
+    z = z.detach()
     p = F.normalize(p, dim=1)
     z = F.normalize(z, dim=1)
-    return -(p*z.detach()).sum(dim=1).mean()
+    return -(p*z).sum(dim=1).mean()
     # return - nn.functional.cosine_similarity(p, z.detach(), dim=-1).mean()
 if __name__ == '__main__':
     main()
