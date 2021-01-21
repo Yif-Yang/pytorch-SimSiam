@@ -54,7 +54,7 @@ parser.add_argument('-b', '--batch-size', default=256, type=int,
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
 parser.add_argument('--lr', '--learning-rate', default=30., type=float,
-                    metavar='LR', help='initial learning rate', dest='lr')
+                    metavar='LR', help='initial learning rate')
 parser.add_argument('--schedule', default=[60, 80], nargs='*', type=int,
                     help='learning rate schedule (when to drop lr by a ratio)')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
@@ -96,6 +96,7 @@ best_acc1 = 0
 
 def main():
     args = parser.parse_args()
+    args.lr = args.base_lr*args.batch_size/256
 
     if args.seed is not None:
         random.seed(args.seed)
