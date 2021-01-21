@@ -1,5 +1,5 @@
 from .simsiam import SimSiam
-from .simsiam_hua import SimSiam as Simsiamhua
+# from .simsiam_hua import SimSiam as Simsiamhua
 # from .byol import BYOL
 # from .simclr import SimCLR
 from torchvision.models import resnet50, resnet18
