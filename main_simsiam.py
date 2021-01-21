@@ -206,13 +206,13 @@ def main_worker(gpu, ngpus_per_node, args):
             # ourselves based on the total number of GPUs we have
             args.batch_size = int(args.batch_size / ngpus_per_node)
             args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
-            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu], find_unused_parameters=True)
+            model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
             print('set')
         else:
             model.cuda()
             # DistributedDataParallel will divide and allocate batch_size to all
             # available GPUs if device_ids are not set
-            model = torch.nn.parallel.DistributedDataParallel(model, find_unused_parameters=True)
+            model = torch.nn.parallel.DistributedDataParallel(model)
     elif args.gpu is not None:
         torch.cuda.set_device(args.gpu)
         model = model.cuda(args.gpu)
@@ -456,10 +456,10 @@ def adjust_learning_rate(optimizer, epoch, args):
 
 
 def negcos(p, z):
-    # z = z.detach()
+    z = z.detach()
     p = F.normalize(p, dim=1)
     z = F.normalize(z, dim=1)
-    return -(p*z.detach()).sum(dim=1).mean()
+    return -(p*z).sum(dim=1).mean()
     # return - nn.functional.cosine_similarity(p, z.detach(), dim=-1).mean()
 if __name__ == '__main__':
     main()
