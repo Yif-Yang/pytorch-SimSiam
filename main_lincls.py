@@ -2,6 +2,7 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import argparse
 import builtins
+import math
 import os
 import random
 import shutil
@@ -24,7 +25,12 @@ from setlogger import get_logger
 from nvlars import LARC
 import math
 from models.resnet import resnet50
-
+#from simsiam
+from augmentations import get_aug
+from tools import AverageMeter, PlotLogger, knn_monitor, ProgressMeter
+from models import get_model, get_backbone
+from dataset import get_dataset
+from optimizers import get_optimizer, LR_Scheduler
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
     and callable(models.__dict__[name]))
@@ -35,13 +41,13 @@ if not os.path.exists(saved_path):
 logger = get_logger(os.path.join(saved_path, 'train_correctlr.log'))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('data', metavar='DIR',
-                    help='path to dataset')
-parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet50',
-                    choices=model_names,
-                    help='model architecture: ' +
-                        ' | '.join(model_names) +
-                        ' (default: resnet50)')
+parser.add_argument('--model', type=str, default='simsiam')
+parser.add_argument('--backbone', type=str, default='resnet50')
+parser.add_argument('--train_list',  type=str, default='train.txt',
+                    help='name of data list file')
+parser.add_argument('--test_list', type=str, default='test.txt',
+                    help='name of data list file')
+parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet50')
 parser.add_argument('-j', '--workers', default=32, type=int, metavar='N',
                     help='number of data loading workers (default: 32)')
 parser.add_argument('--epochs', default=100, type=int, metavar='N',
@@ -53,13 +59,13 @@ parser.add_argument('-b', '--batch-size', default=256, type=int,
                     help='mini-batch size (default: 256), this is the total '
                          'batch size of all GPUs on the current node when '
                          'using Data Parallel or Distributed Data Parallel')
-parser.add_argument('--lr', '--learning-rate', default=30., type=float,
+parser.add_argument('--base_lr', '--learning-rate', default=30., type=float,
                     metavar='LR', help='initial learning rate', dest='lr')
 parser.add_argument('--schedule', default=[60, 80], nargs='*', type=int,
                     help='learning rate schedule (when to drop lr by a ratio)')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
-parser.add_argument('--wd', '--weight-decay', default=0., type=float,
+parser.add_argument('--wd', '--weight_decay', default=0., type=float,
                     metavar='W', help='weight decay (default: 0.)',
                     dest='weight_decay')
 parser.add_argument('-p', '--print-freq', default=10, type=int,
@@ -91,6 +97,25 @@ parser.add_argument('--pretrained', default='', type=str,
 parser.add_argument('--cos', action='store_true',
                     help='use cosine lr schedule')
 
+parser.add_argument('--dataset', type=str, default='cifar10',
+                    help='choose from random, stl10, mnist, cifar10, cifar100, imagenet')
+parser.add_argument('--download', action='store_true', help="if can't find dataset, download from web")
+parser.add_argument('--proj_layers', type=int, default=None,
+                    help="number of projector layers. In cifar experiment, this is set to 2")
+parser.add_argument('--optimizer', type=str, default='sgd',
+                    help='sgd, lars(from lars paper), lars_simclr(used in simclr and byol), larc(used in swav)')
+parser.add_argument('--eval_after_train', type=str, default=None)
+parser.add_argument('--test_epoch', type=int, default=10)
+parser.add_argument('--debug', action='store_true')
+parser.add_argument('--is_cifar', action='store_true')
+parser.add_argument('--image_size', type=int, default=224)
+parser.add_argument('--data_dir', type=str, default=os.getenv('DATA'))
+parser.add_argument('--output_dir', type=str, default=os.getenv('OUTPUT'))
+parser.add_argument('--hide_progress', action='store_true')
+parser.add_argument('--warmup_epochs', type=int, default=0,
+                    help='learning rate will be linearly scaled during warm up period')
+parser.add_argument('--warmup_lr', type=float, default=0, help='Initial warmup learning rate')
+parser.add_argument('--final_lr', type=float, default=0)
 best_acc1 = 0
 
 
@@ -132,6 +157,7 @@ def main():
 def main_worker(gpu, ngpus_per_node, args):
     global best_acc1
     args.gpu = gpu
+    print('gpu : ', gpu)
 
     # suppress printing if not master
     if args.multiprocessing_distributed and args.gpu != 0:
@@ -154,7 +180,8 @@ def main_worker(gpu, ngpus_per_node, args):
     # create model
     print("=> creating model '{}'".format(args.arch))
     # model = models.__dict__[args.arch]()
-    model = resnet50()
+    # model = get_model(args.model, args.arch, args.is_cifar or 'cifar' in args.dataset)
+    model = get_backbone(args.arch, castrate=False)
     # freeze all layers but the last fc
     for name, param in model.named_parameters():
         if name not in ['fc.weight', 'fc.bias']:
@@ -262,41 +289,60 @@ def main_worker(gpu, ngpus_per_node, args):
     cudnn.benchmark = True
 
     # Data loading code
-    traindir = os.path.join(args.data, 'train')
-    valdir = os.path.join(args.data, 'val')
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    # traindir = os.path.join(args.data, 'train')
+    # valdir = os.path.join(args.data, 'val')
+    # normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+    #                                  std=[0.229, 0.224, 0.225])
 
-    train_dataset = datasets.ImageFolder(
-        traindir,
-        transforms.Compose([
-            transforms.RandomResizedCrop(224),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            normalize,
-        ]))
+    dataset_kwargs = {
+        'dataset': args.dataset,
+        'data_dir': args.data_dir,
+        'download': args.download,
+        'debug_subset_size': args.batch_size if args.debug else None
+    }
+    train_dataset = get_dataset(args,
+                          transform=get_aug(args.model, args.image_size, False),
+                          train=True,
+                          **dataset_kwargs)
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     else:
         train_sampler = None
 
+    dataloader_kwargs = {
+        'batch_size': args.batch_size,
+        'drop_last': True,
+        'pin_memory': True,
+        'num_workers': args.workers,
+        'sampler': train_sampler,
+    }
+
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
-        num_workers=args.workers, pin_memory=True, sampler=train_sampler)
+        dataset=train_dataset,
+        shuffle=(train_sampler is None),
+        **dataloader_kwargs
+    )
+    print('(train_sampler is None): ', (train_sampler is None) , 'len(train_loader)', len(train_loader))
 
-    val_loader = torch.utils.data.DataLoader(
-        datasets.ImageFolder(valdir, transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
-
+    memory_loader = torch.utils.data.DataLoader(
+        dataset=get_dataset(args,
+            transform=get_aug(args.model, args.image_size, False, train_classifier=False),
+            train=True,
+            **dataset_kwargs),
+        shuffle=False,
+        **dataloader_kwargs
+    )
+    test_loader = torch.utils.data.DataLoader(
+        dataset=get_dataset(args,
+            transform=get_aug(args.model, args.image_size, False, train_classifier=False),
+            train=False,
+            **dataset_kwargs),
+        shuffle=False,
+        **dataloader_kwargs
+    )
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        validate(test_loader, model, criterion, args)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -309,7 +355,7 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        acc1 = validate(test_loader, model, criterion, args)
 
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
