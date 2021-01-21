@@ -10,7 +10,7 @@ def resnet18_cifar_new(**kwargs):
     from .resnet_cifar_new import resnet18 as resnet18_new
     return resnet18_new()
 
-def resnet_cifar_new_no_maxpool(**kwargs):
+def resnet18_cifar_new_no_maxpool(**kwargs):
     from .resnet_cifar_new_no_maxpool import resnet18 as resnet18_new_no_maxpool
     return resnet18_new_no_maxpool()
 

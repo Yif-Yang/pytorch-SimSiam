@@ -391,11 +391,11 @@ def train(train_loader, model, optimizer, epoch, args, lr_scheduler):
         # output, target = model(im_q=images[0], im_k=images[1])
         # loss = criterion(output, target)
 
-        # z1, p1 = model(images[0])
-        # z2, p2 = model(images[1])
-        # loss = negcos(p1, z2) / 2 + negcos(p2, z1) / 2
+        z1, p1 = model(images[0])
+        z2, p2 = model(images[1])
+        loss = negcos(p1, z2) / 2 + negcos(p2, z1) / 2
 
-        loss = model(x1=images[0], x2=images[1])
+        # loss = model(x1=images[0], x2=images[1])
 
 
         # acc1/acc5 are (K+1)-way contrast classifier accuracy

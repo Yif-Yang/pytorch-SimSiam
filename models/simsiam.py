@@ -84,7 +84,7 @@ class SimSiam(nn.Module):
         net=backbone
         num_ftrs = net.fc.in_features
         net = list(net.children())
-        net = net[:3] + net[4:]
+        # net = net[:3] + net[4:]
         self.features = nn.Sequential(*net[:-1])
         # num_ftrs = net.fc.out_features
         # self.features = net
@@ -99,14 +99,14 @@ class SimSiam(nn.Module):
 
         self.reset_parameters()
 
-    # def forward(self, x):
-    #     x = self.features(x)
-    #     x = x.view(x.size(0), -1)
-    #     # projection
-    #     z = self.projection(x)
-    #     # prediction
-    #     p = self.prediction(z)
-    #     return z, p
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        # projection
+        z = self.projection(x)
+        # prediction
+        p = self.prediction(z)
+        return z, p
 
     # def forward(self, x, x1):
     #     x, x = self.features(x)
@@ -116,15 +116,15 @@ class SimSiam(nn.Module):
     #     # prediction
     #     p = self.prediction(z)
     #     return z, p
-    def forward(self, x1, x2):
-        x1, x2 = self.features(x1), self.features(x2)
-        x1 = x1.view(x1.size(0), -1)
-        x2 = x2.view(x2.size(0), -1)
-        f, h = self.projection, self.prediction
-        z1, z2 = f(x1), f(x2)
-        p1, p2 = h(z1), h(z2)
-        L = D(p1, z2) / 2 + D(p2, z1) / 2
-        return L
+    # def forward(self, x1, x2):
+    #     x1, x2 = self.features(x1), self.features(x2)
+    #     # x1 = x1.view(x1.size(0), -1)
+    #     # x2 = x2.view(x2.size(0), -1)
+    #     f, h = self.projection, self.prediction
+    #     z1, z2 = f(x1), f(x2)
+    #     p1, p2 = h(z1), h(z2)
+    #     L = D(p1, z2) / 2 + D(p2, z1) / 2
+    #     return L
     def reset_parameters(self):
         # reset conv initialization to default uniform initialization
         for m in self.modules():
